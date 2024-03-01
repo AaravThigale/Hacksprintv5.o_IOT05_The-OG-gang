@@ -1,0 +1,75 @@
+#include <ESP8266WiFi.h>
+#include <DHT.h>
+#include <string>
+
+
+#define DHTPIN 2 // Pin connected to the DHT sensor
+#define DHTTYPE DHT11 // DHT 11 sensor
+
+// Replace with your WiFi credentials
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+// Replace with your ThingSpeak API key and channel ID
+const char* myAPI = "YOUR_THINGSPEAK_API_KEY";
+const String myField1 = "field1"; // Field for temperature
+const String myField2 = "field2"; // Field for humidity
+const String server = "api.thingspeak.com";
+
+DHT dht(DHTPIN, DHTTYPE);
+WiFiClient client;
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  delay(1000);
+
+  // Connect to WiFi network
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void loop() {
+  // Read temperature and humidity from DHT sensor
+  delay(2000); // Delay between readings
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
+
+  // Check if any reads failed and exit early (to avoid NaN values)
+  if (isnan(temp) || isnan(hum)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+
+  // Create HTTP POST request string
+
+String data = std::string("api_key=") + myAPI + "&";
+  data += myField1 + "=" + String(temp) + "&";
+  data += myField2 + "=" + String(hum);
+
+  Serial.print("Connecting to ThingSpeak server... ");
+  if (client.connect(server, 80)) {
+    Serial.println("Connected");
+    // Send HTTP POST request
+    client.print("POST /update HTTP/1.1\n");
+    client.print("Host: ");
+    client.println(server);
+    client.print("Content-Type: application/x-www-form-urlencoded\n");
+    client.print("Content-Length: ");
+    client.println(data.length());
+    client.println();
+    client.println(data);
+    client.stop();
+    Serial.println("Data sent successfully");
+  } else {
+    Serial.println("Connection failed!");
+  }
+}
